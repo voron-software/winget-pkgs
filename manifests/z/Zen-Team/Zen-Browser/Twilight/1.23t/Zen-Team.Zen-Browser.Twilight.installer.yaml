@@ -29,16 +29,16 @@ FileExtensions:
 - xht
 - xhtml
 ProductCode: Zen Twilight
-ReleaseDate: 2026-09-08
+ReleaseDate: 2026-09-09
 Installers:
 - Architecture: x64
   InstallerUrl: https://github.com/zen-browser/desktop/releases/download/twilight-1/zen.installer.exe
-  InstallerSha256: A7CB30AC6850F920C0CB74A2FD6700EAC0CB5D1958942DACF7C92ACCD18925FE
+  InstallerSha256: 626EC251BD901A762F341F9F1C81364561D14631BB9B2A7C5A9C6B34469D1FCE
   AppsAndFeaturesEntries:
   - DisplayName: Zen Twilight (x64 en-US)
 - Architecture: arm64
   InstallerUrl: https://github.com/zen-browser/desktop/releases/download/twilight-1/zen.installer-arm64.exe
-  InstallerSha256: 895F7E78F270780A88AEE9182B065BC0281F469A4DC4FCACA66E3300F83A82B3
+  InstallerSha256: 510FA8508C035D0F40FA18727046A91DC8932A180B6479D2A8C47F7306E65770
   AppsAndFeaturesEntries:
   - DisplayName: Zen Twilight (AArch64 en-US)
 ManifestType: installer
