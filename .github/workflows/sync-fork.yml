@@ -1,0 +1,75 @@
+name: Sync fork
+
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Rebuild master on upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          gh auth setup-git
+          git init --bare -q "$RUNNER_TEMP/sync-fork.git"
+          cd "$RUNNER_TEMP/sync-fork.git"
+
+          git remote add fork "https://github.com/${GITHUB_REPOSITORY}.git"
+          git remote add upstream https://github.com/microsoft/winget-pkgs.git
+          git fetch --no-tags fork refs/heads/master:refs/sync/fork
+          git fetch --no-tags upstream refs/heads/master:refs/sync/upstream
+
+          upstream=$(git rev-parse refs/sync/upstream)
+          fork=$(git rev-parse refs/sync/fork)
+          workflow=.github/workflows/sync-fork.yml
+
+          if git cat-file -e "$upstream:$workflow" 2>/dev/null; then
+            echo "Upstream already contains $workflow" >&2
+            exit 1
+          fi
+          if ! git cat-file -e "$fork:$workflow" 2>/dev/null; then
+            echo "Fork is missing $workflow" >&2
+            exit 1
+          fi
+          mapfile -t parents < <(git cat-file -p "$fork" | sed -n 's/^parent //p')
+          if [[ ${#parents[@]} -eq 1 && ${parents[0]} == "$upstream" ]]; then
+            echo "Fork is already one commit ahead of upstream"
+            exit 0
+          fi
+
+          base=$(git merge-base "$upstream" "$fork")
+          if [[ -z $base ]]; then
+            echo "Could not find the fork's upstream base" >&2
+            exit 1
+          fi
+          if ! git diff --quiet "$base" "$fork" -- . ":(exclude)$workflow"; then
+            echo "Fork contains changes outside $workflow" >&2
+            exit 1
+          fi
+
+          mode=$(git ls-tree "$fork" -- "$workflow" | cut -f1 | cut -d' ' -f1)
+          blob=$(git rev-parse "$fork:$workflow")
+          export GIT_INDEX_FILE="$RUNNER_TEMP/sync-fork.index"
+          git read-tree "$upstream"
+          git update-index --add --cacheinfo "$mode,$blob,$workflow"
+          tree=$(git write-tree)
+          commit=$(printf 'Keep fork sync workflow\n' | \
+            GIT_AUTHOR_NAME='github-actions[bot]' \
+            GIT_AUTHOR_EMAIL='41898282+github-actions[bot]@users.noreply.github.com' \
+            GIT_COMMITTER_NAME='github-actions[bot]' \
+            GIT_COMMITTER_EMAIL='41898282+github-actions[bot]@users.noreply.github.com' \
+            git commit-tree "$tree" -p "$upstream")
+
+          git push --force-with-lease="refs/heads/master:$fork" \
+            fork \
+            "$commit:refs/heads/master"
